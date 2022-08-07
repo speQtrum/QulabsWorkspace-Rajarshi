@@ -15,7 +15,7 @@ from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
 from qiskit import quantum_info, IBMQ, Aer
 from qiskit import BasicAer, transpile
 from qiskit.utils import QuantumInstance
-from qiskit.quantum_info import Statevector, partial_trace , DensityMatrixs
+from qiskit.quantum_info import Statevector, partial_trace , DensityMatrix
 from qiskit.algorithms import optimizers, AmplitudeEstimation, EstimationProblem, AmplificationProblem, Grover, GroverResult, AmplitudeAmplifier
 from qiskit.circuit.library import LinearAmplitudeFunction, LinearPauliRotations, PiecewiseLinearPauliRotations, WeightedAdder, GroverOperator
 from qiskit_finance.circuit.library import LogNormalDistribution, NormalDistribution
@@ -70,12 +70,35 @@ def generate_oracles(good_states: list) -> QuantumCircuit :
     
     return oracle_circuit
 
+    
+def to_oracle(pattern, name= 'oracle'):
+    """ Convert a given pattern to an oracle
+        input: pattern= a numpy vector with binarry entries 
+        output: oracle.Gate    """
 
-def diffuser(l):
-    """ Gnerate the Diffuser operator for the case where the initial state  is 
+    l = len(pattern)
+    qr = QuantumRegister(l, name='reg')
+    a = AncillaRegister(1, name='ancilla')
+    qc = QuantumCircuit(qr, a, name= name+str(pattern))
+    for q in range(l):
+        if(pattern[q]==0): qc.x(qr[q])
+    qc.x(a)
+    qc.h(a)
+    qc.mcx(qr, a)
+    qc.h(a)
+    qc.x(a)
+    for q in range(l):
+        if(pattern[q]==0): qc.x(qr[q])
+    #qc.barrier()
+    return qc.to_gate()
+
+
+def diffuser(l:int)-> QuantumCircuit :
+    """ Generate the Diffuser operator for the case where the initial state  is 
         the equal superposition state of all basis vectors 
         input: l= no. of qubits
         output: diffuser.Gate    """
+
     qr = QuantumRegister(l, name='reg')
     a = AncillaRegister(1, name='ancilla')
     circuit = QuantumCircuit(qr, a, name= 'Diff.')
@@ -129,7 +152,7 @@ def grover(patterns, grover_steps): ## modified sub-routine for grover based on 
   
     return qc
 
-def s_psi0(p):  ## initial state preparation for a single qubit 
+def s_psi0(p:float)-> QuantumCircuit :  ## initial state preparation for a single qubit 
     """ Prepare a QuantumCircuit that intiates a single qubit state
         input:
             p= amplitude 
@@ -140,7 +163,7 @@ def s_psi0(p):  ## initial state preparation for a single qubit
     theta = 2*np.arcsin(np.sqrt(p))
     qc.ry(theta, 0)
 
-    return qc.to_gate()
+    return qc
 
 
 #####################################################################################
