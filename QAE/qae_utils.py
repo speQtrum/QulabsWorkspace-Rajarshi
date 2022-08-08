@@ -70,7 +70,7 @@ def generate_oracles(good_states: list) -> QuantumCircuit :
     
     return oracle_circuit
 
-    
+
 def to_oracle(pattern, name= 'oracle'):
     """ Convert a given pattern to an oracle
         input: pattern= a numpy vector with binarry entries 
@@ -152,12 +152,18 @@ def grover(patterns, grover_steps): ## modified sub-routine for grover based on 
   
     return qc
 
+
+####################################################################################
+####################################################################################
+
+## single qubit handler functions  ~
+
 def s_psi0(p:float)-> QuantumCircuit :  ## initial state preparation for a single qubit 
     """ Prepare a QuantumCircuit that intiates a single qubit state
         input:
-            p= amplitude 
+            p= amplitude of |1> in intial state
         output:
-            s_psi0 gate                                            """
+            s_psi0                                             """
 
     qc = QuantumCircuit(1, name= " S_psi0 ")
     theta = 2*np.arcsin(np.sqrt(p))
@@ -166,10 +172,59 @@ def s_psi0(p:float)-> QuantumCircuit :  ## initial state preparation for a singl
     return qc
 
 
+def Q(p: float, power:int= 1)-> QuantumCircuit:
+    """ Prepare an 'QuantumCircuit' to implement grover operator 'Q'
+        input:
+            p= amplitude of |1> in intial state
+            power= no.of times 'Q' is imposed
+        output:
+            Q^k                                                 """
+
+    theta = 2*np.arcsin(np.sqrt(p))
+    qc = QuantumCircuit(1, name= ' Q'+ '^'+ str(power) )
+    qc.ry(2*theta*power, 0)
+
+    return qc
+
+
 #####################################################################################
 #####################################################################################
 
-## helper functions for likelihood estimation
+## sub-routines for QPE ~
+
+def crot(qc, l):
+    """ Function to generate Controlled Rotation Ooeration  """
+
+    if l == 0:
+        return qc
+    l = l-1
+    qc.h(l)
+    for q in range(l):
+        qc.cp(pi/2**(l-q), q, l)
+    #qc.barrier()
+    # qc.draw()
+    
+def QFT(qc):
+   """function to generate QFT circuit """
+
+   dim = qc.num_qubits
+   for q in range(dim):
+      crot(qc, dim-q)
+   for q in range(int(dim/2)):
+      qc.swap(q, dim-q-1)
+   
+   #qc.draw()
+   return qc
+
+def qpe(): ## TODO 
+    pass  
+
+#####################################################################################
+#####################################################################################
+
+
+
+## helper functions for maximum likelihood estimation ~
 
 def likelihood(n,m, shots, thetas= np.linspace(0, 2*pi, 100), log= False):
     """ Generate likelihood function over the given range of 'thetas'
