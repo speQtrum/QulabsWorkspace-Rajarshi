@@ -2,6 +2,7 @@
 ####################################################################
 
 ## imports ~
+from tabnanny import verbose
 import numpy as np
 from numpy import pi
 import matplotlib.pyplot as plt
@@ -20,6 +21,7 @@ from qiskit.algorithms import optimizers, AmplitudeEstimation, EstimationProblem
 from qiskit.circuit.library import LinearAmplitudeFunction, LinearPauliRotations, PiecewiseLinearPauliRotations, WeightedAdder, GroverOperator
 from qiskit_finance.circuit.library import LogNormalDistribution, NormalDistribution
 from qiskit.visualization import plot_histogram, plot_state_qsphere, plot_bloch_multivector, plot_bloch_vector
+from qiskit import execute
 
 qsm = Aer.get_backend('qasm_simulator')
 stv = Aer.get_backend('statevector_simulator')
@@ -165,6 +167,8 @@ def s_psi0(p:float)-> QuantumCircuit :  ## initial state preparation for a singl
         output:
             s_psi0                                             """
 
+    if verbose: print("inside-> 's_psi0'")
+
     qc = QuantumCircuit(1, name= " S_psi0 ")
     theta = 2*np.arcsin(np.sqrt(p))
     qc.ry(theta, 0)
@@ -179,6 +183,8 @@ def Q(p: float, power:int= 1)-> QuantumCircuit:
             power= no.of times 'Q' is imposed
         output:
             Q^k                                                 """
+    
+    if verbose: print("inside-> 'Q'")
 
     theta = 2*np.arcsin(np.sqrt(p))
     qc = QuantumCircuit(1, name= ' Q'+ '^'+ str(power) )
@@ -222,6 +228,65 @@ def qpe(): ## TODO
 #####################################################################################
 #####################################################################################
 
+## helper function for Quantum Phase Estimation ~
+
+def qpe(p: float, trainable:bool= False, p_param:Union[float, None]= None , precision:int= 4, no_estimates:int= 5 ):
+    
+    ## define the grover operator ~
+    # p = 0.25
+
+    # precision= 4
+    ## generate the Quantum Circuit ~
+    preg = QuantumRegister(precision, name= 'precision_q')
+    qreg = QuantumRegister(1, name='qreg')
+    creg = ClassicalRegister(precision, name='precision_c')
+    qc = QuantumCircuit(preg,qreg, creg)
+
+    qc.h(preg)
+    qc.append(s_psi0(p), [precision] )
+    qc.barrier()
+
+    if trainable== True:
+        for q in range(precision):
+            qc.append(Q( p_param  , 2**q).to_gate().control(1), [q]+list(range(precision,precision+1)) )
+    
+    else:
+        for q in range(precision):
+            qc.append(Q(p,2**q).to_gate().control(1), [q]+list(range(precision,precision+1)) )
+
+    qftgate_inv = QFT(QuantumCircuit(precision, name='QFT')).to_gate().inverse()
+    qc.barrier()
+    qc.append(qftgate_inv, list(range(precision)))
+
+    qc.measure(preg, creg)
+    shots = 2000
+    job = execute(qc, backend= aer, shots= shots)
+    counts = job.result().get_counts()
+
+    # no_estimates= 5
+    estimate = sorted(zip(counts.values(), counts.keys()), reverse= True)
+    p_est = 0
+    for p in range(no_estimates): 
+        p_est += np.sin(int(estimate[p][1], 2)*pi/(2**precision))**2 * (estimate[p][0]/ shots)
+
+    return p_est
+
+
+def to_minimize(p_params, p= 0.2 , precision:int= 4, no_estimates:int= 5 ):
+    print("inside-> to_minimize") ## 
+    p_est = qpe(p, trainable= True, p_param= p_params[0])
+    print("ourside-> qpe, p_est", p_est)
+    cost = (p_params - p_est)**2
+    print("cost ", cost)
+    return cost
+
+
+
+
+
+
+#####################################################################################
+#####################################################################################
 
 
 ## helper functions for maximum likelihood estimation ~
