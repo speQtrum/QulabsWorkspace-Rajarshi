@@ -1,13 +1,14 @@
 ####################################################################
+                            ## imports ##
 ####################################################################
 
-## imports ~
+
 from tabnanny import verbose
 import numpy as np
 from numpy import pi
 import matplotlib.pyplot as plt
 import math
-from typing import Union
+from typing import Iterable, Union, Optional
 
 ## qiskit imports ~
 # from qiskit import *
@@ -27,10 +28,11 @@ qsm = Aer.get_backend('qasm_simulator')
 stv = Aer.get_backend('statevector_simulator')
 aer = Aer.get_backend('aer_simulator')
 
-####################################################################
-####################################################################
+#############################################################################
+                    ## grover operator  fucntions ##
+#############################################################################
 
-## grover operator  fucntions ~
+
 
 def str_to_oracle(pattern: str, name= 'oracle', return_type = "QuantumCircuit" ) -> Union[QuantumCircuit,  Statevector] :
     """ Convert a given string to an oracle circuit
@@ -156,9 +158,10 @@ def grover(patterns, grover_steps): ## modified sub-routine for grover based on 
 
 
 ####################################################################################
+                        ## single qubit handler functions  ##
 ####################################################################################
 
-## single qubit handler functions  ~
+
 
 def s_psi0(p:float)-> QuantumCircuit :  ## initial state preparation for a single qubit 
     """ Prepare a QuantumCircuit that intiates a single qubit state
@@ -194,9 +197,10 @@ def Q(p: float, power:int= 1)-> QuantumCircuit:
 
 
 #####################################################################################
+                            ## sub-routines for QPE ##
 #####################################################################################
 
-## sub-routines for QPE ~
+
 
 def crot(qc, l):
     """ Function to generate Controlled Rotation Ooeration  """
@@ -226,9 +230,10 @@ def qpe(): ## TODO
     pass  
 
 #####################################################################################
+                ## Helper function for Quantum Phase Estimation ##
 #####################################################################################
 
-## helper function for Quantum Phase Estimation ~
+
 
 def qpe(p: float, trainable:bool= False, p_param:Union[float, None]= None , precision:int= 4, no_estimates:int= 5 ):
     
@@ -286,10 +291,9 @@ def to_minimize(p_params, p= 0.2 , precision:int= 4, no_estimates:int= 5 ):
 
 
 #####################################################################################
+                ## Helper functions for maximum likelihood estimation ##
 #####################################################################################
 
-
-## helper functions for maximum likelihood estimation ~
 
 def likelihood(n,m, shots, thetas= np.linspace(0, 2*pi, 100), log= False):
     """ Generate likelihood function over the given range of 'thetas'
@@ -340,3 +344,119 @@ def generate_le(p,q= 1, shots= 100, thetas= np.linspace(0, 2*pi, 50, endpoint= F
     return le
     
     
+#############################################################################################
+                       ### State Preparation Ansatz ###
+#############################################################################################
+
+class state_preparation_ansatz(QuantumCircuit):
+    
+    def __init__(self,
+        num_ancillas: int,
+        name: str= "Q",
+        params: Optional[Union[Iterable, str, None]]= "random",
+        insert_barrier:bool= False)-> None:
+
+        super().__init__(name= name)
+
+        ## set inputs ~
+        self._num_ancillas= num_ancillas
+        self._name= name
+        self._insert_barrier= insert_barrier
+        self._params= params
+        self._num_params = self._num_ancillas * 4 + 2
+
+        ## build parameters ~
+        qreg = QuantumRegister(1)
+        ancillas = AncillaRegister(self._num_ancillas)
+        qc = QuantumCircuit(qreg, ancillas)
+        self.add_register(*qc.qregs)
+                
+
+    @property
+    def num_ancillas(self):
+        """ No, of ancillas used in the ansatz """
+        return self._num_ancillas
+    
+    @property
+    def num_params(self):
+        """ No. of parmaters passed into the ansatz """
+        return self._num_params
+
+    def load_params(self, params_to_load: Iterable):
+        
+        ## get list of tunable paramters ~
+        param_data = [ data[0] for data in self.data if data[0].name== 'ry' ]
+        for index, instrc in enumerate(param_data): 
+            instrc.params = [ params_to_load[index]]
+
+        return self
+
+    def show_params(self):
+        print("\n params_state: ", self._params_state)
+        print("\n params_ancillas_init: ", self._params_ancilla_init)
+        print("\n params_ancillas: ", self._params_ancilla)
+        print("\n params_ancillas_end: ", self._params_ancilla_end)
+
+    def _build(self, params):
+
+        if isinstance(params, str) and params== "random":
+
+            print(" 'random' ")
+            self._params_state = np.random.uniform(low=0, high= 2*pi, size= 2)
+            self._params_ancilla_1= np.random.uniform(low=0, high= 2*pi, size= self._num_ancillas )
+            self._params_ancilla_2= np.random.uniform(low=0, high= 2*pi, size= self._num_ancillas )
+            self._params_ancilla_init= np.random.uniform(low=0, high= 2*pi, size= self._num_ancillas )
+            self._params_ancilla_end= np.random.uniform(low=0, high= 2*pi, size= self._num_ancillas )
+            print(" 'params_ancilla_end': ", self._params_ancilla_end) ##checkflag
+            
+        elif isinstance(params, Iterable):
+
+            if len(params) != self._num_params: raise ValueError(" no. of elements in 'params' must be ", self._num_params )
+            self._params_state= np.append(params[0],params[-1])
+            self._params_ancilla_init= params[1: 1 + self._num_ancillas]
+            self._params_ancilla_1= params[1 + self._num_ancillas: 1 + 2 * self._num_ancillas]
+            self._params_ancilla_2= params[1+ 2 * self._num_ancillas: 1 + 3 * self._num_ancillas]
+            self._params_ancilla_end = params[1 + 3 * self._num_ancillas: -1]
+
+
+        params_state = self._params_state
+        params_ancilla_1= self._params_ancilla_1
+        params_ancilla_2 = self._params_ancilla_2
+        params_ancilla_init = self._params_ancilla_init
+        params_ancilla_end = self._params_ancilla_end
+        
+
+        ancillas = self.ancillas
+        qreg = self.qubits[0]
+
+        ## set_ansatz ~
+        self.h(ancillas)
+        self.ry(params_state[0], qreg)
+
+        for index, ancilla in list(enumerate(self.ancillas))  : self.ry(params_ancilla_init[index], ancilla)
+        if self._insert_barrier == True: self.barrier()
+
+        self.cx(qreg, ancillas[0])
+
+        for index, ancilla in list(enumerate(ancillas))  :
+            self.ry(params_ancilla_1[index], ancilla)
+            self.cx(ancillas[index], ancillas[(index+1)%(self._num_ancillas)])
+        
+        if self._insert_barrier == True: self.barrier()
+        
+        for index, ancilla in list(reversed(list(enumerate(ancillas))))  :
+            self.ry(params_ancilla_2[index], ancilla)
+            self.cx(ancillas[index], ancillas[(index-1)%(self._num_ancillas)])
+
+        self.cx( ancillas[0], qreg)
+        
+        if self._insert_barrier == True: self.barrier()     
+        for index, ancilla in list(enumerate(ancillas))  : self.ry(params_ancilla_end[index], ancilla)   
+     
+        self.ry(params_state[1], qreg)
+        self.h(ancillas)
+        
+    
+        return self
+
+           
