@@ -349,11 +349,26 @@ def generate_le(p,q= 1, shots= 100, thetas= np.linspace(0, 2*pi, 50, endpoint= F
 #############################################################################################
 
 class state_preparation_ansatz(QuantumCircuit):
+    """ 
+        A class to initiate the state preparation ansatz for the Variational QAE algorithm
+
+        ARGS
+        ----
+            num_ancillas:[int]
+                        no. of ancillas to be used for the ansatz prepration
+            name:[str]
+                    name of the ansatz circuit
+
+        RETURNS
+        -------
+                [QuantumCircuit] implementing the state preparation ansatz
+
+    """
     
     def __init__(self,
         num_ancillas: int,
         name: str= "Q",
-        params: Optional[Union[Iterable, str, None]]= "random",
+        # params: Optional[Union[Iterable, str, None]]= "random",
         insert_barrier:bool= False)-> None:
 
         super().__init__(name= name)
@@ -362,7 +377,7 @@ class state_preparation_ansatz(QuantumCircuit):
         self._num_ancillas= num_ancillas
         self._name= name
         self._insert_barrier= insert_barrier
-        self._params= params
+        # self._params= params
         self._num_params = self._num_ancillas * 4 + 2
 
         ## build parameters ~
@@ -383,21 +398,49 @@ class state_preparation_ansatz(QuantumCircuit):
         return self._num_params
 
     def load_params(self, params_to_load: Iterable):
+        """ 
+            ARGS
+            ----
+                params_to_load:[Iterable]
+                                new parametes to be reassigned into the ansatz
+
+            RETURNS
+            -------
+                 [QuantumCircuit] with reassigned paramters
+
+        """
         
         ## get list of tunable paramters ~
         param_data = [ data[0] for data in self.data if data[0].name== 'ry' ]
+        
+        ## reset the paramters with new 'params_to_load' ~
         for index, instrc in enumerate(param_data): 
             instrc.params = [ params_to_load[index]]
 
         return self
 
     def show_params(self):
-        print("\n params_state: ", self._params_state)
-        print("\n params_ancillas_init: ", self._params_ancilla_init)
-        print("\n params_ancillas: ", self._params_ancilla)
-        print("\n params_ancillas_end: ", self._params_ancilla_end)
+        """ Print the current paramter values in the ansatz """
+        
+        param_data = [ data[0] for data in self.data if data[0].name== 'ry' ]
+        for index, intrc in enumerate(param_data):
+            print( 'param' +str(index)+': ' ,intrc.params)
 
-    def _build(self, params):
+
+    def initialize(self, params):
+        """ Function to build the state preparation circuit 
+
+            ARGS
+            ----
+                params:[Iterable, str]
+                        paramters to initialize the circuit.
+                        if params = 'random' the circuit paramters are initialised randomly 
+            RETURNS
+            -------
+                 [QuantumCircuit] with initialised paramters
+
+
+        """
 
         if isinstance(params, str) and params== "random":
 
@@ -407,7 +450,7 @@ class state_preparation_ansatz(QuantumCircuit):
             self._params_ancilla_2= np.random.uniform(low=0, high= 2*pi, size= self._num_ancillas )
             self._params_ancilla_init= np.random.uniform(low=0, high= 2*pi, size= self._num_ancillas )
             self._params_ancilla_end= np.random.uniform(low=0, high= 2*pi, size= self._num_ancillas )
-            print(" 'params_ancilla_end': ", self._params_ancilla_end) ##checkflag
+        
             
         elif isinstance(params, Iterable):
 
