@@ -29,7 +29,7 @@ stv = Aer.get_backend('statevector_simulator')
 aer = Aer.get_backend('aer_simulator')
 
 #############################################################################
-                    ## grover operator  fucntions ##
+                    ## grover operator sub-routines ##
 #############################################################################
 
 
